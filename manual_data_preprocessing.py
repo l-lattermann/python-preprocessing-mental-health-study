@@ -1,11 +1,12 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from tabulate import tabulate
+import numpy as np
 
 
 data_path = r'C:\Users\Laurenz\Documents\00AA UNI\3. Semester\Machine Learning - Unsupervised Learning and Feature Engineering\Project\Data\mental-heath-in-tech-2016_20161114.csv'
 
-
+# Shorten column labels
 def shorten_column_lables(dataframe, column_name_abbreviations):
     """
     Shortens the column labels of a DataFrame using a list of abbreviations.
@@ -41,6 +42,7 @@ def shorten_column_lables(dataframe, column_name_abbreviations):
 
     return dataframe
 
+# Extract all unique feature values
 def extract_all_unique_feature_values(dataframe):
     """
     Extracts all unique feature values from a DataFrame. 
@@ -70,6 +72,7 @@ def extract_all_unique_feature_values(dataframe):
 
     return unique_values_df
 
+# Write DataFrame to CSV in readable format
 def df_to_readable_csv(dataframe, path: str):
     """
     Writes a DataFrame to a CSV file in a readable format.
@@ -90,6 +93,7 @@ def df_to_readable_csv(dataframe, path: str):
 
     return None
 
+# Save DataFrame to CSV
 def save_dataframe_to_csv(dataframe, name: str):
     """
     Saves a DataFrame to a CSV file.
@@ -111,6 +115,7 @@ def save_dataframe_to_csv(dataframe, name: str):
 
     return None
 
+# Get value counts per feature
 def get_value_count_per_feature(dataframe):
     """
     Returns the value counts for each feature in a DataFrame.
@@ -144,6 +149,7 @@ def get_value_count_per_feature(dataframe):
         
     return value_counts_df
 
+# Extract features with extraordinary value counts
 def extract_features_extraodinary_value_counts(dataframe, threshold_over_mean: float):
     """
     Extracts features with extraordinary value counts from a DataFrame.
@@ -185,8 +191,57 @@ def impute_missing_numeric_values(dataframe):
     """
     # Impute missing values with the mean of the respective column
     dataframe.fillna(dataframe.mean(), inplace=True)
+    print("imputed with mean: ", dataframe.head())
 
     return dataframe
+
+# Binary encoding for yes no maybe
+def binary_encoding_yes_no_maybe(dataframe):
+    """
+    Encodes 'Yes', 'No', and 'Maybe'/ 'I don't know' as 1, 0, and 0.5, respectively.
+
+    Parameters
+    ----------
+    dataframe : pandas.DataFrame
+        The DataFrame in which to encode 'Yes', 'No', and 'Maybe'.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The DataFrame with encoded values.
+    """
+    # Create a dictionary to map the values
+    encoding_dict = {'Yes': 1, 'yes': 1, 'No': 0, 'no': 0, 'Maybe': 0.5, 'maybe': 0.5,  "I don't know": 0.5}
+
+    # Save the dataframe before encoding
+    dataframe_before_encoding = dataframe.copy()
+
+    # Apply the encoding to the DataFrame and save the lables of changed columns in a list
+    changed_columns = []
+    for x in dataframe.columns:
+        
+        if dataframe[x].isin(encoding_dict.keys()).any():
+            dataframe[x] = dataframe[x].map(encoding_dict)
+            changed_columns.append(x)
+    
+    # Check if the encoding was successful and respective columns only contain 1, 0, or 0.5 or NaN
+    if dataframe[changed_columns].isin([1, 0, 0.5, None, np.nan]).all().all():
+        return dataframe
+    else:
+        return dataframe_before_encoding
+        
+
+
+
+
+    
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
 # Use the specified path for the CSV file
@@ -277,13 +332,14 @@ if __name__ == "__main__":
     print(value_counts_df.to_string())
 
     # Extract features with extraordinary value counts
-    extraordinary_value_counts = extract_features_extraodinary_value_counts(value_counts_df, threshold_over_mean = 0.3)   
-    print(extraordinary_value_counts.to_string())
+    extraordinary_value_counts = extract_features_extraodinary_value_counts(value_counts_df, threshold_over_mean = 0.3)
 
     # Display the features with extraordinary value counts as a bar plot in matplotlib
-    extraordinary_value_counts.plot(kind='bar', figsize=(6, 6))
+    """ extraordinary_value_counts.plot(kind='bar', figsize=(6, 6))
     plt.tight_layout(pad=1.0)
-    plt.show()
+    plt.show() """
 
+    # Impute missing values in the DataFrame
+    impute_missing_numeric_values(studydata)
 
     print("all donekkk6")

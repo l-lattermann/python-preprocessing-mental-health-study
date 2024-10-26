@@ -238,4 +238,4 @@ class Changelog:
                 except TypeError:
                     changelog.write("\n There was an error writing the content to the changelog file.")
                     changelog.write("\n\n" + "Content datatype: " + str(type(content)))
-        return
+        

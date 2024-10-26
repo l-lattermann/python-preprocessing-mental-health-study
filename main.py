@@ -49,3 +49,10 @@ if __name__ == "__main__":
 
     # Replace age outliers with NaN
     dc.replace_age_outliers(study_data, changelog)
+
+    # Fill missing age values with the median
+    enc.fill_missing_values(study_data, changes, changelog)
+
+    # Apply binary and ordinal encoding
+    enc.apply_bin_ord_encoding(study_data, changes, changelog)
+

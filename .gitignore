@@ -11,7 +11,12 @@ __pycache__/
 # Ignore local file paths or sensitive files
 file_paths.json
 settings.json
-To-do-list.txt
 
 # Ignore IDE/editor specific settings
 .vscode/
+
+# Ignore todo list and other srcatch files
+Scratches/
+
+# Ignore Data files
+data/

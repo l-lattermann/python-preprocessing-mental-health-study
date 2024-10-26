@@ -1,8 +1,0 @@
-- Drop rows with over 50% of missing data 
-- Removed outliers from age
-- Missing value handling:
-  - Listwise deletion for variables with more than half missing observations
-  - Simple imputation for others
-- Column encoding
-- Filtered countries (kept only those with more than 30 responses)
-- Created "tech" column with flag 1/0

@@ -8,87 +8,94 @@ import numpy as np
 import sklearn as sk
 import re
 
+import changelog as log
 
-# Function to write object to changelog
-def write_to_changelog(path: str, message: str, content: any = None):
-    """
-    Writes content to a changelog file.
-
-    Parameters
-    ----------
-    changelog_path : str
-        The path to the changelog file.
-    message : str
-        The message to be written to the changelog file.
-    content : any
-        The content to be written to the changelog file.
-    """
-    # Get the functionname that called write_to_changelog
-    calling_function = inspect.stack()[1].function
-
-    with open(path, 'a', encoding='utf-8') as changelog:
-        changelog.write("\n\n"+ "_"*200 + "\n")
-        changelog.write(pd.Timestamp.now().strftime("%Y.%m.%d. %H:%M:1%S ") + "within" + calling_function + ":\n")
-        changelog.write(message + "\n")
-
-            # Check if content is a DataFrame
-        if isinstance(content, pd.DataFrame):
-            changelog.write("\n" + tabulate(content, headers='keys', tablefmt='pretty'))
-        # Check if content is a dictionary
-        elif isinstance(content, dict):
-            changelog.write("\n" + str(content))
-        # Check if content is a list or tuple
-        elif isinstance(content, (list, tuple)):
-            changelog.write("\n" + ', '.join(map(str, content)))
-        # Handle general objects by converting to string if possible
-        elif isinstance(content, object):
-            if hasattr(content, 'to_string'):
-                changelog.write("\n" + str(content.to_string()))
-            else:
-                changelog.write("\n" + str(content))
-        else:
-            # Fallback for primitives (int, float, etc.)
-            changelog.write("\n" + str(content))
-    
-        # Close the changelog file
-        changelog.close()
 
 # Main function
 if __name__ == "__main__":
     
     # Load all file paths from json file
-    with open('file_paths.json', 'r', encoding='latin1') as file:
-        file_paths = json.load(file)
+    with open('file_paths.json', 'r', encoding='latin1') as changelog:
+        file_paths = json.load(changelog)
 
         data_path = file_paths['data_path'][0]['path']
         changelog_path = file_paths['changelog_path'][0]['path']
         all_changes_path = file_paths['all_changes_path'][0]['path']
 
-    
+    # Initialize the changelog file
+    log.init_changelog(changelog_path)
+
     # Load the study data
     study_data = pd.read_csv(data_path, encoding='utf-8')
 
     # Write to changelog
-    write_to_changelog(changelog_path, "Loaded study data from: " + data_path)
+    log.write("Loaded study data from: " + data_path)
     
     # Load the changes to be made to the study data
     changes = pd.read_csv(all_changes_path, encoding='utf-8')
 
     # Write to changelog
-    write_to_changelog(changelog_path, "Loaded changes data from: " + all_changes_path)
+    log.write("Loaded changes data from: " + all_changes_path)
 
-    # Clean weird spaces in the dataset
-    matches_columns = study_data.columns.str.extractall(r'([\xa0]+)')                       # Iterate over all string columns and extract non-ASCII characters
-    study_data.columns = study_data.columns.str.replace(r'([\xa0]+)', '', regex=True)       # Remove non-breaking spaces
-    study_data.columns = study_data.columns.str.strip()                                     # Strip leading and trailing spaces
-    for column in study_data.columns:
-        replaced_strings = study_data[column].apply(lambda x: str(x).replace('\xa0', ' ') if isinstance(x, str) else x).tolist() # Iterate over all string columns and extract non-ASCII characters
-        study_data[column] = study_data[column].apply(lambda x: str(x).replace(r'([\xa0]+)', '') if isinstance( x, str) else x)  # Remove non-breaking spaces
-        study_data[column] = study_data[column].apply(lambda x: x.str.strip() if isinstance(x, str) else x)                               # Strip leading and trailing spaces
+    # Check for all non ASCII characters in the column names and data
+    # Set to store unique non-ASCII characters
+    non_ascii_characters_columns = set()
+    non_ascii_characters_data = set()
+
+    # Find non-ASCII characters in column names
+    for col in study_data.columns:
+        matches = re.findall(r'[^\x00-\x7F]', col)
+        non_ascii_characters_columns.update(matches)
+
+    # Find non-ASCII characters in the data
+    study_data.applymap(lambda text: non_ascii_characters_data.update(re.findall(r'[^\x00-\x7F]', text)) if isinstance(text, str) else None)
+
+    # Convert characters to hex representation for better readability
+    hex_dict_columns = {char: hex(ord(char)) for char in non_ascii_characters_columns}
+    hex_dict_data = {char: hex(ord(char)) for char in non_ascii_characters_data}
 
     # Write to changelog
-    write_to_changelog(changelog_path, "Cleaned weird spaces in the dataset. Columns with non-breaking spaces:", matches_columns)
-    write_to_changelog(changelog_path, "Cleaned weird spaces in the dataset. Data with non-breaking spaces:", matches_data)
+    log.write("Detected following non-ASCII characters in the column names:", hex_dict_columns)
+    log.append("\nDetected following non-ASCII characters in the data:", hex_dict_data)
+
+    # Save columns containing non-breaking spaces to list
+    matches_columns_before = study_data.columns[study_data.columns.str.contains(r'[\xa0]', regex=True)].tolist() 
+
+    # Clean non-breaking spaces from the column names
+    study_data.columns = [re.sub('\s+', ' ', col) for col in study_data.columns]    # Remove non-breaking spaces
+
+    # Check if Regex was successful
+    matches_columns_after = study_data.columns[study_data.columns.str.contains(r'[\xa0]', regex=True)].tolist() 
+
+    # Strip leading and trailing spaces
+    study_data.columns = study_data.columns.str.strip()                                     
+
+    # Write to changelog
+    log.write("Columns with non-breaking spaces before cleaning:", matches_columns_before)
+    log.append("\nColumns with non-breaking spaces after cleaning:", matches_columns_after)
+
+    matches_data_before = []    # List to store the columns with non-breaking spaces
+    matches_data_after = []     # List to store the columns with non-breaking spaces
+    for column in study_data.columns:
+        # Extract data with non-breaking spaces
+        matches_data_before.append(study_data[column].apply(lambda x: x if isinstance(x, str) and '\xa0' in x else np.nan).dropna().tolist())   
+
+        # Clean non breaking spaces from the data
+        study_data[column] = study_data[column].apply(lambda x: re.sub(r'\s+', '', x) if isinstance(x, str) else x)
+        
+        # Check if Regex was successful
+        matches_data_after.append(study_data[column].apply(lambda x: x if isinstance(x, str) and '\xa0' in x else np.nan).dropna().tolist())
+        
+        # Strip leading and trailing spaces
+        study_data[column] = study_data[column].apply(lambda x: x.strip() if isinstance(x, str) else x)                                         
+
+    # Remove empty lists from matches_data_before and matches_data_after
+    matches_data_before = [x for x in matches_data_before if x]
+    matches_data_after = [x for x in matches_data_after if x]
+
+    # Write to changelog
+    log.write("Cleaned weird spaces in the dataset. Data with non-breaking spaces:", matches_data_before)
+    log.append("\nData with non-breaking spaces after cleaning:", matches_data_after)
 
     # Create a copy for later comparison
     study_data_copy = study_data.copy()    
@@ -99,7 +106,7 @@ if __name__ == "__main__":
     drop_lines_percent = (1 - (study_data.shape[0] / original_count)) *100    # Calculate the percentage of dropped rows
 
     # Write to changelog
-    write_to_changelog(changelog_path, f"Dropped {drop_lines_percent}% of rows due to missing values.")
+    log.write(f"Dropped {drop_lines_percent}% of rows due to missing values.")
 
     # Apply new shortend column labels
     new_labels_dict = {}    # Dictionary to store the old and new labels
@@ -108,7 +115,7 @@ if __name__ == "__main__":
     study_data.columns = study_data.columns.map(new_labels_dict)
 
     # Write to changelog
-    write_to_changelog(changelog_path, "Applied new shortened column labels as follows:\n", new_labels_dict)
+    log.write("Applied new shortened column labels as follows:\n", new_labels_dict)
 
     # Replace age outliers with NaN
     age_copy = study_data['age'].copy()    # Create a copy for later comparison
@@ -116,7 +123,7 @@ if __name__ == "__main__":
     age_checksum = (study_data['age'] != age_copy).sum()    # Check how many rows were changed
     
     # Write to changelog
-    write_to_changelog(changelog_path, f"Replaced age outliers with NaN for {age_checksum} rows.")
+    log.write(f"Replaced age outliers with NaN for {age_checksum} rows.")
 
     # Fill missing age values with the median
     age_copy_2 = study_data['age'].copy()    # Create a copy for later comparison
@@ -125,13 +132,13 @@ if __name__ == "__main__":
     age_checksum_2 = (age_copy_2 != study_data['age']).sum()    # Check how many rows were changed
 
     # Write to changelog
-    write_to_changelog(changelog_path, f"Filled missing age values with the median: {age_median}  for {age_checksum_2} rows.")
+    log.write(f"Filled missing age values with the median: {age_median}  for {age_checksum_2} rows.")
 
     # Get the encoding type for the columns
     encoding_types_dict = dict(zip(changes['new_labels'], changes['encoding_type']))
 
     # Write to changelog
-    write_to_changelog(changelog_path, "Encoding types for columns are as follows:", encoding_types_dict)
+    log.write("Encoding types for columns are as follows:", encoding_types_dict)
 
     # Convert JSON-like strings in 'encoding' column in changes df to actual python dict
     temp_store_encoding = changes['encoding'].copy()    # Create a copy for later comparison
@@ -142,38 +149,46 @@ if __name__ == "__main__":
     non_converted_rows = changes.loc[changes['encoding'].apply(lambda x: isinstance(x, str))].index
     # Write to changelog
     bin_ord_checksum = (changes['encoding'] != temp_store_encoding).sum()    # Check how many rows were changed
-    write_to_changelog(changelog_path, f"Converted JSON-like strings in 'encoding' column to actual python dict for {bin_ord_checksum} rows.\nRows that were not converted: {non_converted_rows}")
+    log.write(f"Converted JSON-like strings in 'encoding' column to actual python dict for {bin_ord_checksum} rows.\nRows that were not converted:", non_converted_rows)
 
     # Apply binary and ordinal encoding to the respective columns
-    bin_ord_applied_list = []   # List to store the columns that binary and ordinal encoding was applied to
-    for label, encoding_type in encoding_types_dict.items():
+    bin_ord_applied_succ = []       # List to store the columns that binary and ordinal encoding was applied to
+    bin_ord_applied_fail = []       # List to store the columns that binary and ordinal encoding was not applied to
+    column_prob_values_dict = {}    # Dictionary to store the columns with problematic values
+    for column_name, encoding_type in encoding_types_dict.items():
         if encoding_type in {'bin', 'ord'}:
 
             # Get the encoding dictionary from the changes dataframe
-            if isinstance(changes.loc[changes['new_labels'] == label, 'encoding'].values[0], dict):
-                encoding = changes.loc[changes['new_labels'] == label, 'encoding'].values[0]
-
+            if isinstance(changes.loc[changes['new_labels'] == column_name, 'encoding'].values[0], dict):
+                encoding = changes.loc[changes['new_labels'] == column_name, 'encoding'].values[0]
                 
-
                 # Map the study data to the encoding
-                #print(f"label is: {label} \n","unique values for this label are:\n",study_data[label].unique(), "\nencoding keys for this lable are:\n", encoding.keys(),"\n" + "-"*100)
-                study_data[label] = study_data[label].map(encoding)
-                
+                study_data[column_name] = study_data[column_name].map(encoding)
 
-                # Append the label to the list of applied binary and ordinal encodings
-                bin_ord_applied_list.append(label)
-    
+                # Check if encoding was successful
+                unique_values = set(study_data[column_name].unique()) | {np.nan}
+                expected_values = set(encoding.values()) | {np.nan}
+                if unique_values == expected_values:
+                    bin_ord_applied_succ.append(column_name)
+                else:
+                    bin_ord_applied_fail.append(column_name)
+                    log.write(f"Binary and ordinal encoding was not successful for column: {column_name}\n the following are the unique values: {unique_values}\n the following are the expected values: {expected_values}")
+                    
+                    # Get the problematic colums where encoding was not successful
+                    column_prob_values_dict[column_name] = set(study_data[column_name].unique()) - (set(encoding.values()) | {np.nan})
+
     # Write to changelog
-    for label in bin_ord_applied_list:
-        write_to_changelog(changelog_path, f"Applied binary and ordinal encoding to the following columns: {label}\n"
-                       f"Data looks as follows{study_data[label].dropna().head()}:\n")
+    log.write("Applied binary and ordinal encoding to the following columns successfully:", bin_ord_applied_succ)
+    log.write("Applied binary and ordinal encoding to the following columns not successfully:", bin_ord_applied_fail)
+    log.write("Columns with problematic values after encoding:", column_prob_values_dict)
         
     
     # Get a list of columns with mostly missing values
-    missing_values_columns = study_data.columns[study_data.isna().mean() > 0.99].tolist()
+    missing_thresh = 0.999    # Set the threshold for missing values
+    missing_values_columns = study_data.columns[study_data.isna().mean() > missing_thresh].tolist()
 
     # Write to changelog
-    write_to_changelog(changelog_path, "Columns with mostly missing values:", missing_values_columns)
+    log.write(f"Columns with mostly missing values (Threshold = {missing_thresh}):", missing_values_columns)
         
 
     # Fill missing values with the mean of the column
@@ -188,6 +203,9 @@ if __name__ == "__main__":
         if changes.loc[changes['new_labels'] == column_name, 'encoding_type'].values[0] == 'bin':
 
             # Calculate the proportion of 1s and 0s in the binary column
+            # Check if the column has only 1s and 0s
+            uniques = study_data[column_name].dropna().unique()
+            log.write(f"Trying to perform numeric action on string.. Search Unique values in column {column_name} for strings: ", uniques)
             proportion_of_1s = study_data[column_name].mean()  # Fraction of 1s (mean of binary data)
 
             # Generate random choices of 0 or 1 based on the existing proportion
@@ -222,51 +240,51 @@ if __name__ == "__main__":
             columns_fillna_applied_list.append(column_name)
 
         else:
-                write_to_changelog(changelog_path, "No encoding type found for column: " + column_name)
+                log.write("No encoding type found for column: " + column_name)
                 # Append the column name to the list of columns not filled missing values
                 columns_fillna_not_applied_list.append(column_name)
                 continue
         
-        # Write to changelog:
-        write_to_changelog(changelog_path, "Filled missing values in the following columns: ", columns_fillna_applied_list)
-        write_to_changelog(changelog_path, "No fillings were applied in following columns: ", columns_fillna_not_applied_list)
+    # Write to changelog:
+    log.write("Filled missing values in the following columns: ", columns_fillna_applied_list)
+    log.write("No fillings were applied in following columns: ", columns_fillna_not_applied_list)
     
     # Apply TF-IDF encoding to the contextual columns
     tfidf_applied_list = []    # List to store the columns that TF-IDF encoding was applied to
-    for label, encoding_type in encoding_types_dict:
+    for column_name, encoding_type in encoding_types_dict:
         if encoding_type == 'TF-IDF':
             # Apply TF-IDF encoding
             tfidf = sk.feature_extraction.text.TfidfVectorizer()
-            study_data[label] = tfidf.fit_transform(study_data[label])
+            study_data[column_name] = tfidf.fit_transform(study_data[column_name])
 
             # Append the label to the list of applied TF-IDF encodings
-            tfidf_applied_list.append(label)
+            tfidf_applied_list.append(column_name)
 
     # Write to changelog
-    write_to_changelog(changelog_path, "Applied TF-IDF encoding to the following columns:", tfidf_applied_list)
+    log.write("Applied TF-IDF encoding to the following columns:", tfidf_applied_list)
     
     # Apply one-hot encoding to the multiple choice columns
     one_hot_applied_list = []    # List to store the columns that one-hot encoding was applied to
-    for label, encoding_type in encoding_types_dict:
+    for column_name, encoding_type in encoding_types_dict:
         if encoding_type == 'one-hot':
 
             # Initialize the OneHotEncoder
             encoder = sk.preprocessing.OneHotEncoder(sparse_output=False, handle_unknown='ignore')
 
             # Apply one-hot encoding to the specified column
-            one_hot_encoded = encoder.fit_transform(study_data[[label]])
+            one_hot_encoded = encoder.fit_transform(study_data[[column_name]])
 
             # Convert to DataFrame and rename columns with the original label prefix
-            one_hot_df = pd.DataFrame(one_hot_encoded, columns=encoder.get_feature_names_out([label]))
+            one_hot_df = pd.DataFrame(one_hot_encoded, columns=encoder.get_feature_names_out([column_name]))
 
             # Concatenate the new one-hot encoded DataFrame with the original DataFrame
-            study_data = pd.concat([study_data.drop(columns=[label]), one_hot_df], axis=1)
+            study_data = pd.concat([study_data.drop(columns=[column_name]), one_hot_df], axis=1)
 
             # Append the label to the list of applied one-hot encodings
-            one_hot_applied_list.append(label)
+            one_hot_applied_list.append(column_name)
     
     # Write to changelog
-    write_to_changelog(changelog_path, "Applied one-hot encoding to the following columns:", one_hot_applied_list)
+    log.write("Applied one-hot encoding to the following columns:", one_hot_applied_list)
 
     
 

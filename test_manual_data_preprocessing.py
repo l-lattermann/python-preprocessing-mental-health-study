@@ -46,4 +46,6 @@ def test_binary_encoding_yes_no_maybe():
     # Check that the DataFrames are equal
     pd.testing.assert_frame_equal(binary_encoded_dataframe, expected_dataframe)
 
-
+# Test  select encoding types
+def test_select_encoding_types():
+    

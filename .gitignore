@@ -1,0 +1,17 @@
+# Ignore the virtual environment
+.venv/
+
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+
+# Ignore pytest cache
+.pytest_cache/
+
+# Ignore local file paths or sensitive files
+file_paths.json
+settings.json
+To-do-list.txt
+
+# Ignore IDE/editor specific settings
+.vscode/

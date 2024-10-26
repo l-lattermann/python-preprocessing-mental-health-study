@@ -1,45 +1,93 @@
+import json
+from pathlib import Path
+import inspect
 import pandas as pd
 import matplotlib.pyplot as plt
 from tabulate import tabulate
 import numpy as np
+import sklearn as sk
 
 
-data_path = r'C:\Users\Laurenz\Documents\00AA UNI\3. Semester\Machine Learning - Unsupervised Learning and Feature Engineering\Project\Data\mental-heath-in-tech-2016_20161114.csv'
+# Function to write object to changelog
+def write_to_changelog(changelog_path: str, message: str, content: any):
+    """
+    Writes content to a changelog file.
+
+    Parameters
+    ----------
+    changelog_path : str
+        The path to the changelog file.
+    message : str
+        The message to be written to the changelog file.
+    content : any
+        The content to be written to the changelog file.
+    """
+    # Get the functionname that called write_to_changelog
+    calling_function = inspect.stack()[1].function
+
+    with open(changelog_path, 'a', encoding='utf-8') as changelog:
+        changelog.write(pd.Timestamp.now().strftime("%Y.%m.%d. %H:%M:1%S ") + "within" + calling_function + ":\n")
+        changelog.write("\t" + message + "\n")
+
+            # Check if content is a DataFrame
+        if isinstance(content, pd.DataFrame):
+            changelog.write("\n" + tabulate(content, headers='keys', tablefmt='pretty'))
+        # Check if content is a dictionary
+        elif isinstance(content, dict):
+            changelog.write("\n" + str(content))
+        # Check if content is a list or tuple
+        elif isinstance(content, (list, tuple)):
+            changelog.write("\n" + ', '.join(map(str, content)))
+        # Handle general objects by converting to string if possible
+        elif isinstance(content, object):
+            if hasattr(content, 'to_string'):
+                changelog.write("\n" + str(content.to_string()))
+            else:
+                changelog.write("\n" + str(content))
+        else:
+            # Fallback for primitives (int, float, etc.)
+            changelog.write("\n" + str(content))
+    
+        # Close the changelog file
+        changelog.close()
 
 # Shorten column labels
-def shorten_column_lables(dataframe, column_name_abbreviations):
+def shorten_column_lables(dataframe, changelog_path: str):
     """
-    Shortens the column labels of a DataFrame using a list of abbreviations.
+    Shortens the column labels of a DataFrame using user input.
 
     Parameters
     ----------
     dataframe : pandas.DataFrame
         The DataFrame whose column labels should be shortened.
-    column_name_abbreviations : list
-        A list of abbreviations to be used as new column labels.
+    changelog_path : str
+        The path to the changelog file.
 
     Returns
     -------
     pandas.DataFrame
         The DataFrame with shortened column labels.
     """
+    # Create a dictionary to store the new column labels
+    new_labels_dict = {}
+    # Display the original column label and ask the user for a new label
+    for col in dataframe.columns:
+        print("\n\nOriginal column label: '{}'".format(col))
+        try:
+            new_label = input("Enter a new label: ")
+            new_labels_dict[col] = new_label
+            dataframe.rename(columns={col: new_label}, inplace=True)
+        except Exception as e:
+            print("An error occurred: ", e)
+            continue
+    
+    # New lables dict to dataframe
+    new_labels_df = pd.DataFrame(collumns= ['old lables', 'new lables'], data=[dataframe.columns, new_labels_dict.values()])
 
-    # Create a dictionary with column indices as keys and column names as values
-    column_index_mapping = {column: index for index, column in enumerate(dataframe.columns)}
+    # New lables df to csv
+    new_labels_df.to_csv('new_labels.csv', index=False)
 
-    # Merge abbreviations with column names dictionary
-    if len(column_index_mapping) == len(column_name_abbreviations):
-        
-        # Merge abbreviations with column names dictionary
-        for key in column_index_mapping:
-            column_index_mapping[key] = column_name_abbreviations[column_index_mapping[key]]
-        
-    else:
-        print("The two lists have different lengths.")
-
-    # Apply new column indices to the DataFrame
-    dataframe.rename(columns=column_index_mapping, inplace=True)
-
+    write_to_changelog(changelog_path, "Colum names got change to the following labels: \n", new_labels_df)
     return dataframe
 
 # Extract all unique feature values
@@ -72,46 +120,34 @@ def extract_all_unique_feature_values(dataframe):
 
     return unique_values_df
 
-# Write DataFrame to CSV in readable format
-def df_to_readable_csv(dataframe, path: str):
-    """
-    Writes a DataFrame to a CSV file in a readable format.
-
-    Parameters
-    ----------
-    dataframe : pandas.DataFrame
-        The DataFrame to be written to a CSV file.
-    path : str
-        The path where the CSV file should be saved.
-
-    Returns
-    -------
-    None
-    """
-    # Write the DataFrame to a CSV file
-    dataframe.to_csv(path, index=False, line_terminator='\n')
-
-    return None
-
 # Save DataFrame to CSV
-def save_dataframe_to_csv(dataframe, name: str):
+def save_dataframe_to_csv(dataframe, data_path: str, changelog_path: str, name: str):
     """
     Saves a DataFrame to a CSV file.
+    Returns None.
 
     Parameters
     ----------
     dataframe : pandas.DataFrame
-        The DataFrame to be saved.
-    path : str
-        The path where the CSV file should be saved.
-
-    Returns
-    -------
-    None
+        The DataFrame to be saved to a CSV file.
+    data_path : str 
+        The path where the original data was retrieved.
+    changelog_path : str
+        The path to the changelog file.
+    name : str
+        The name of the CSV file.
     """
-    
+    name = name + pd.Timestamp.now().strftime("%Y-%m-%d %H-%M-%S")
+
+    # Create new path assuming old path contains file name
+    directory = Path(data_path).parent
+    new_file_path = directory / f'{name}.csv'
+
     # Write the DataFrame to a CSV file
-    dataframe.to_csv(r'..\..\..\Data\{}.csv'.format(name), index=False)
+    dataframe.to_csv(new_file_path, index=False)
+
+    # Write to changelog
+    write_to_changelog(changelog_path, "DataFrame saved to CSV file at:\n{}".format(new_file_path),content= None)
 
     return None
 
@@ -229,117 +265,196 @@ def binary_encoding_yes_no_maybe(dataframe):
         return dataframe
     else:
         return dataframe_before_encoding
-        
 
+# ordinal encoding of company size
+def ordinal_encoding_company_size(dataframe):
+    """
+    Encodes the 'company_size' feature using ordinal encoding.
 
+    Parameters
+    ----------
+    dataframe : pandas.DataFrame
+        The DataFrame in which to encode 'company_size'.
 
+    Returns
+    -------
+    pandas.DataFrame
+        The DataFrame with encoded 'company_size'.
+    """
+    # Create a dictionary to map the values
+    encoding_dict = {'1-5': 1, '6-25': 2, '26-100': 3, '100-500': 4, '500-1000': 5, 'More than 1000': 6}
+
+    # Apply the encoding to the DataFrame
+    dataframe['company_size'] = dataframe['company_size'].map(encoding_dict)
+
+    return dataframe
+
+# One-hot encoding of categorical features
+def one_hot_encoding(dataframe, columns):
+    """
+    Encodes categorical features using one-hot encoding.
+
+    Parameters
+    ----------
+    dataframe : pandas.DataFrame
+        The DataFrame in which to encode categorical features.
+    columns : list
+        A list of columns to be one-hot encoded.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The DataFrame with one-hot encoded features.
+    """
+    # Apply one-hot encoding to the DataFrame
+    dataframe = pd.get_dummies(dataframe, columns=columns)
+
+    return dataframe
+
+# Iterate over all columns and ask user to select encoding type from a list
+def select_encoding_type(dataframe, changelog_path: str):
+    """
+    Iterates over all columns in a DataFrame and asks the user to select an encoding type from a list.
+
+    Parameters
+    ----------
+    dataframe : pandas.DataFrame
+        The DataFrame for which to select encoding types.
+    changelog_path : str
+        The path to the changelog file.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The DataFrame with selected encoding types.
+    """
+    # Create a dictionary to store the encoding types
+    encoding_dict = {}
+
+    # Iterate over each column and ask the user to select an encoding type
+    for col in dataframe:
+        print("\n\nSelect encoding type for column '{}':".format(col))
+        print("Data looks like this: ", dataframe[col].dropna().unique()[:7])
+        print("0: Skip column")
+        print("1: Binary encoding")
+        print("2: Ordinal encoding")
+        print("3: One-hot encoding")
+        print("4: One-hot encoding, but need speparation of values")
+        print("5: TF-IDF encoding")
+        print("6: Skip all remaining columns")
+        encoding_type = input("Enter the number of the encoding type: ")
+
+        try:
+        # Apply the selected encoding type
+            if encoding_type == '0':
+                continue
+            elif encoding_type == '1':
+                encoding_dict[col] = 'binary'
+            elif encoding_type == '2':
+                encoding_dict[col] = 'ordinal'
+            elif encoding_type == '3':
+                encoding_dict[col] = 'one-hot'
+            elif encoding_type == '4':
+                encoding_dict[col] = 'one-hot-sep'
+            elif encoding_type == '5':
+                encoding_dict[col] = 'tf-idf'
+            elif encoding_type == '6':
+                break
+            else:
+                print("Invalid encoding type. Please try again.")
+        except Exception as e:
+            print("An error occurred: ", e)
+            continue
+
+    # Write the encoding type to the dictionary to csv
+    encoding_dict_df = pd.DataFrame({
+        'column': list(encoding_dict.keys()),
+        'encoding type': list(encoding_dict.values())
+    })
+    save_dataframe_to_csv(encoding_dict_df, data_path, changelog_path, 'encoding_dict')
+    # Open the changelog file
+    write_to_changelog(changelog_path, "Encoding types selected for each column.", encoding_dict_df.to_string())
+
+    return encoding_dict
+
+# Data that contains combinations of predifined standardised textual values will be string parsed and one-hot encoded
+def encode_multiple_choice_textual_data(dataframe):
+    """
+    Encodes multiple choice textual data in a DataFrame using one-hot encoding.
+
+    Parameters
+    ----------
+    dataframe : pandas.DataFrame
+        The DataFrame in which to encode multiple choice textual data.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The DataFrame with encoded multiple choice textual data.
+    """
+    # Check if column contains pipes
+    for col in dataframe.columns:
+        if pd.api.types.is_string_dtype(dataframe[col].dropna()):
+            if dataframe[col].str.contains('|', regex=False).any():
+            # Parse data that contains combinations of predifined standardised textual values from string to list of strings
+                string_parsed_df = dataframe[col].map(lambda x: x.split('|') if isinstance(x, str) else x)
+                # Check which columns where string parsed
+                changelog_dict = {'all cells parsed' : [], 'not all cells parsed' : [], 'no cells parsed' :[]}
+                # Iterate over columns
+                for column in string_parsed_df.columns:
+                    original_col = dataframe[column]
+                    parsed_col = string_parsed_df[column]
+
+                    original_col = original_col.dropna()
+                    parsed_col = parsed_col.dropna()
+                    
+                    # Track whether each row was changed or not
+                    changes = [isinstance(orig, str) and isinstance(parsed, list) for orig, parsed in zip(original_col, parsed_col)]
+                
+                    # Check the dtype of the cells in the column
+                    if all(changes):  # All values were changed (split)
+                        changelog_dict['all cells parsed'].append(column)
+                    elif any(changes):  # Some values were changed, some were not
+                        changelog_dict['not all cells parsed'].append(column)
+                    else:  # No values were changed
+                        continue
+    # Create a DataFrame from the changelog dictionary
+    changelog_df = pd.DataFrame()
+    for key, value in changelog_dict.items():
+        changelog_df = pd.concat([changelog_df, pd.DataFrame({key: value})], axis=1)
 
     
+    # Write the changelog to the changelog file
+    write_to_changelog(changelog_path, "String parsed multiple choice textual data. Columns were changed: ", changelog_df)
 
+    return string_parsed_df
 
-
-
-
-
-
-
+# Main function
 if __name__ == "__main__":
-# Use the specified path for the CSV file
+    # Load relevant file paths from file_paths.json
+    with open('file_paths.json', 'r', encoding='utf-8') as file:
+        file_paths = json.load(file)
+
+    # Load the data path and changelog path
+    data_path = file_paths['data_path'][0]['path']
+    changelog_path = file_paths['changelog_path'][0]['path']
+    new_labels_path = file_paths['new_labels_path'][0]['path']
+    print(new_labels_path)
+
+    # Load the data
     studydata = pd.read_csv(data_path)
 
-    # Create a dictionary with abbreviated column names
-    column_name_abbreviations = ['self_emp',
-                    'company_size',
-                    'tech_employer',
-                    'tech_role',
-                    'mental_health_benefits',
-                    'aware_mental_health_options',
-                    'discussed_mental_health',
-                    'mental_health_resources',
-                    'anonymity_mental_health',
-                    'mental_health_leave_comfort',
-                    'neg_mental_health_conseq_employer',
-                    'neg_physical_health_conseq_employer',
-                    'comfortable_with_coworkers',
-                    'comfortable_with_supervisor',
-                    'employer_takes_mental_health_seriously',
-                    'neg_consequences_mental_health',
-                    'medical_coverage_mental_health',
-                    'aware_local_resources',
-                    'reveal_to_clients',
-                    'neg_conseq_revealed_client',
-                    'reveal_to_coworkers',
-                    'neg_conseq_revealed_coworker',
-                    'mental_health_affects_productivity',
-                    'work_time_affected_by_mental_health',
-                    'previous_employers',
-                    'previous_employers_mental_health_benefits',
-                    'aware_prev_mental_health_options',
-                    'prev_discussed_mental_health',
-                    'prev_provided_resources',
-                    'prev_anonymity_protected',
-                    'prev_neg_mental_health_conseq',
-                    'prev_neg_physical_health_conseq',
-                    'discuss_with_prev_coworkers',
-                    'discuss_with_prev_supervisor',
-                    'prev_employers_takes_mental_health_seriously',
-                    'prev_negative_consequences',
-                    'physical_health_with_potential_employer',
-                    'why_not_physical_health',
-                    'mental_health_with_potential_employer',
-                    'why_not_mental_health',
-                    'mental_health_hurt_career',
-                    'team_view_negatively',
-                    'share_with_family',
-                    'observed_bad_handling',
-                    'observed_bad_handling_effect',
-                    'family_history_mental_health',
-                    'past_mental_health_disorder',
-                    'current_mental_health_disorder',
-                    'diagnosed_conditions',
-                    'suspected_conditions',
-                    'diagnosed_by_professional',
-                    'conditions_diagnosed_by_professional',
-                    'sought_mental_health_treatment',
-                    'mental_health_treated_interferes',
-                    'mental_health_not_treated_interferes',
-                    'age', 'gender',
-                    'country_live',
-                    'state_live',
-                    'country_work',
-                    'state_work',
-                    'work_position',
-                    'remote_work']
+    # Load new lables
+    new_labels_df = pd.read_csv(new_labels_path)
 
-    # Display the first few rows of the DataFrame
-    print(studydata.head())
-
-    shorten_column_lables(studydata, column_name_abbreviations)
-
-    print(studydata.head())
-
-    # Extract all unique features and their values
-    unique_feature_df = pd.DataFrame()
-    unique_feature_df = extract_all_unique_feature_values(studydata)
-    print(unique_feature_df.head())
+    # Swap column labels from studydata with new labels
+    studydata.columns = new_labels_df['new_labels']
 
 
-    # Write the DataFrame to a CSV file
-    save_dataframe_to_csv(unique_feature_df, 'shortened_data')
+    # Get one hot encoding for specific columns
+    one_hot_encoded_df = one_hot_encoding(studydata, columns=['work_remotely','mh_diagnosis', 'mh_professional_diagnosis', 'country', 'us_state', 'country_work', 'us_state_work', 'work_position'])
+    save_dataframe_to_csv(one_hot_encoded_df, data_path, changelog_path, 'one_hot_encoded_df')
 
-    # Get the value counts for each feature
-    value_counts_df = get_value_count_per_feature(unique_feature_df)
-    print(value_counts_df.to_string())
 
-    # Extract features with extraordinary value counts
-    extraordinary_value_counts = extract_features_extraodinary_value_counts(value_counts_df, threshold_over_mean = 0.3)
-
-    # Display the features with extraordinary value counts as a bar plot in matplotlib
-    """ extraordinary_value_counts.plot(kind='bar', figsize=(6, 6))
-    plt.tight_layout(pad=1.0)
-    plt.show() """
-
-    # Impute missing values in the DataFrame
-    impute_missing_numeric_values(studydata)
-
+   
     print("all donekkk6")

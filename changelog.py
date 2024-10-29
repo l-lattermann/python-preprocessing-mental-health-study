@@ -239,3 +239,12 @@ class Changelog:
                     changelog.write("\n There was an error writing the content to the changelog file.")
                     changelog.write("\n\n" + "Content datatype: " + str(type(content)))
         
+
+    def write_highlighted (self, message: str, content: any = _sentinel) -> None:
+        with open (self.path, 'a', encoding='utf-8') as file:
+            file.write("\n" + "+"*2000 + "\n")   # Write a line of "+" characters to the changelog file
+        
+        self.write(message, content)            # Write the message to the changelog file
+
+        with open (self.path, 'a', encoding='utf-8') as file:
+            file.write("\n" + "+"*2000 + "\n")   # Write a line of "+" characters to the changelog file

@@ -66,7 +66,6 @@ def remove_unecesarry_characters(study_data: pd.DataFrame, logger: object) -> No
     logger.write("Cleaned weird spaces in the dataset. Data with non-breaking spaces:", matches_data_before)   # Write to changelog
     logger.append("\n\nData with non-breaking spaces after cleaning:", matches_data_after)
 
-
 # Drop rows with over 50% missing values
 def drop_missing_values(study_data: pd.DataFrame, logger: object) -> None:
     """
@@ -87,9 +86,6 @@ def drop_missing_values(study_data: pd.DataFrame, logger: object) -> None:
     drop_lines_percent = (1 - (study_data.shape[0] / original_count)) *100          # Calculate the percentage of dropped rows
 
     logger.write(f"Dropped {drop_lines_percent}% of rows due to missing values.")   # Write to changelog
-
-    
-
 
 # Apply new shortend column labels
 def apply_shortened_labels(study_data: pd.DataFrame, changes: pd.DataFrame, logger: object) -> None:
@@ -116,8 +112,6 @@ def apply_shortened_labels(study_data: pd.DataFrame, changes: pd.DataFrame, logg
     study_data.columns = study_data.columns.map(new_labels_dict)                        # Apply new shortened column labels
 
     logger.write("Applied new shortened column labels as follows:\n", new_labels_dict)  # Write to changelog
-
-    
 
 def replace_age_outliers(study_data: pd.DataFrame, logger: object) -> None:
     """

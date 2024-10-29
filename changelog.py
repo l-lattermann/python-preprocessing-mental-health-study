@@ -1,3 +1,4 @@
+import json
 import inspect
 import pandas as pd
 import numpy as np
@@ -25,7 +26,7 @@ class Changelog:
     
     """
 
-    def __init__(self, custom_path: str = "changelog.txt"): 
+    def __init__(self, JSON_path: bool = False) -> None: 
         """
         Initializes a changelog file in 'w' mode. A header is written to the file.
 
@@ -34,8 +35,15 @@ class Changelog:
         changelog_path : str
             The path to the changelog file.
         """
-        # Set the path to the changelog file
-        self.path = custom_path
+        # Load file paths from json file
+        if JSON_path:
+            try:
+                with open('file_paths.json', 'r', encoding='latin1') as paths:
+                    file_paths = json.load(paths)
+                    changelog_path = file_paths['changelog_path'][0]['path']
+                    self.path = changelog_path
+            except FileNotFoundError:
+                self.path = "changelog.txt"
 
         # Open the changelog file in write mode and write the header
         with open(self.path, 'w', encoding='utf-8') as changelog:

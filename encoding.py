@@ -137,94 +137,113 @@ def apply_bin_ord_encoding(study_data: pd.DataFrame, changes: pd.DataFrame, logg
     
     return
 
-def fill_missing_values(study_data: pd.DataFrame, changes: pd.DataFrame, logger: object):
-        """
-        Fill missing values in the study data according to the encoding type.
+def fill_missing_values(study_data: pd.DataFrame, changes: pd.DataFrame, logger: object) -> None:
+    """
+    Fill missing values in the study data according to the encoding type.
 
-        Parameters
-        ----------
-        study_data : pd.DataFrame
-            The DataFrame containing the study data.
-        changes : pd.DataFrame
-            The DataFrame containing the changes to be made to the study data.
-        logger : object
-            The logger object to write to the changelog.
+    Parameters
+    ----------
+    study_data : pd.DataFrame
+        The DataFrame containing the study data.
+    changes : pd.DataFrame
+        The DataFrame containing the changes to be made to the study data.
+    logger : object
+        The logger object to write to the changelog.
 
-        Returns
-        -------
-        None
+    Returns
+    -------
+    None
 
-        """
+    """
 
-        columns_fillna_applied_list = []            # List to store the columns with filled missing values
-        columns_fillna_not_applied_list = []        # List to store the columns not filled missing values
-        for column_name in changes['new_labels'].dropna():
-            
-            encoding_type = changes.loc[changes['new_labels'] == column_name, 'encoding_type'].values[0]            # Get the encoding type for the column
-
-            # Fill binary with probabilistic approach to preserve the overall mean
-            if encoding_type == 'bin':
-
-                if set(study_data[column_name].dropna()) == {"0", "1"}:                  # Check if the column is binary
-                    study_data[column_name] = study_data[column_name].astype("Int64")    # Convert the column to integer
-
-                try:
-                    proportion_of_1s = study_data[column_name].mean()                    # Fraction of 1s (mean of binary data)
-
-                except TypeError:
-                    dtype_list = []                                                      # List to store the data types of the column
-                    for cell in study_data[column_name]:
-                        dtype_list.append(type(cell))                                    # Get the data types of the column
-                        dtype_list = list(set(dtype_list))                               # Get the unique data types in the column
-                    logger.write(f"Column {column_name} has hast dtype: ", dtype_list)   # Write to changelog
-                    continue
-
-                missing_values_count = study_data[column_name].isna().sum()                         # Count the missing values in the column
-                fill_values = np.random.choice(
-                     [0, 1], size=missing_values_count, p=[1 - proportion_of_1s, proportion_of_1s]  # Create a list with same length and mean
-                     )
-
-                study_data.loc[study_data[column_name].isna(), column_name] = fill_values           # Fill up the missing values from the list
-
-                columns_fillna_applied_list.append(column_name)                                     # Append column name to check list
-
-            # Fill ordinal with the mode value to preserve the overall mode
-            elif encoding_type == 'ord':
-                try:
-                    study_data[column_name] = study_data[column_name].fillna(study_data[column_name].mode()[0])
-                except KeyError:
-                    logger.write(f"Column {column_name} has no mode value.")
-
-                columns_fillna_applied_list.append(column_name)                        # Append column name to check list
-                
-
-            # Fill one-hot encoded columns with NaN
-            elif encoding_type == 'one-hot':
-                study_data[column_name].fillna(np.nan, inplace=True)
-
-                # Append the column name to the list of columns with filled missing values
-                columns_fillna_applied_list.append(column_name)
-
-            # Fill TF-IDF encoded columns with an empty string
-            elif encoding_type == 'TF-IDF':
-                study_data[column_name].fillna('', inplace=True)
-
-                # Append the column name to the list of columns with filled missing values
-                columns_fillna_applied_list.append(column_name)
-
-            else:
-                    logger.write("No encoding type found for column: " + column_name)
-                    # Append the column name to the list of columns not filled missing values
-                    continue
+    columns_fillna_applied_list = []                                                 # List to store the columns with filled missing values
+    columns_fillna_not_applied_list = []                                             # List to store the columns not filled missing values
+    for column_name in changes['new_labels'].dropna():
         
-        # Get the columns where encoding was not applied
-        columns_fillna_not_applied_list = list(set(study_data.columns) - set(columns_fillna_applied_list))
+        encoding_type = changes.loc[
+                changes['new_labels'] == column_name, 'encoding_type'                   # Get the encoding type for the column
+                ].values[0]   
 
-        # Write to changelog:
-        logger.write("Filled missing values in the following columns: ", columns_fillna_applied_list)
-        logger.write("No fillings were applied in following columns: ", columns_fillna_not_applied_list)
+        # Fill binary with probabilistic approach to preserve the overall mean
+        if encoding_type == 'bin':
+            if set(study_data[column_name].dropna()) == {"0", "1"}:                  # Check if the column is binary
+                study_data[column_name] = study_data[column_name].astype("Int64")    # Convert the column to integer
+            try:
+                proportion_of_1s = study_data[column_name].mean()                    # Fraction of 1s (mean of binary data)
 
-        return columns_fillna_not_applied_list
+            except TypeError:                                                        # Log data types if not binary
+                dtype_list = []                                                      # List to store the data types of the column
+                for cell in study_data[column_name]:
+                    dtype_list.append(type(cell))                                    # Get the data types of the column
+                    dtype_list = list(set(dtype_list))                               # Get the unique data types in the column
+                logger.write(f"Column {column_name} has hast dtype: ", dtype_list)   # Write to changelog
+                continue
+
+            missing_values_count = study_data[column_name].isna().sum()                 # Count the missing values in the column
+            fill_values = np.random.choice(                                             # Generate random values
+                    [0, 1],                                                             # Set to choose from
+                    size=missing_values_count,                                          # Number of missing values
+                    p=[1 - proportion_of_1s, proportion_of_1s]                          # Proportions of 1 and 0
+                    )
+
+            study_data.loc[study_data[column_name].isna(), column_name] = fill_values   # Fill up the missing values from the list
+            columns_fillna_applied_list.append(column_name)                             # Append column name to check list
+
+        # Fill ordinal with the mode value to preserve the overall mode
+        elif encoding_type == 'ord':
+            try:
+                study_data[column_name] = study_data[column_name].fillna(
+                        study_data[column_name].mode()[0]                               # Fill missing values with mode
+                        )
+            except KeyError:
+                logger.write(f"Column {column_name} has no mode value.")                # Write to changelog
+
+            columns_fillna_applied_list.append(column_name)                             # Append column name to check list
+
+        # Fill one-hot encoded columns with NaN
+        elif encoding_type == 'one-hot':
+            study_data[column_name].fillna(np.nan, inplace=True)                        # Fill missing values with NaN
+            columns_fillna_applied_list.append(column_name)                             # Append column name to check list
+
+        # Fill TF-IDF encoded columns with an empty string
+        elif encoding_type == 'TF-IDF':
+            study_data[column_name].fillna('', inplace=True)                            # Fill missing values with an empty string
+            columns_fillna_applied_list.append(column_name)                             # Append column name to check list
+
+        else:
+                logger.write("No encoding type found for column: " + column_name)       # Write to changelog
+    
+    # Get the columns where encoding was not applied
+    columns_fillna_not_applied_list = list(
+            set(study_data.columns) - set(columns_fillna_applied_list)                   # Set comprehension for performance
+            )
+
+    logger.write("Filled missing values in the following columns: ", columns_fillna_applied_list)       # Write to changelog
+    logger.write("No fillings were applied in following columns: ", columns_fillna_not_applied_list)
+
+    return
+
+def check_for_missing_values(study_data: pd.DataFrame, logger: object) -> None:
+    """
+    Check for missing values in the study data.
+
+    Parameters
+    ----------
+    study_data : pd.DataFrame
+        The DataFrame containing the study data.
+    logger : object
+        The logger object to write to the changelog.
+
+    Returns
+    -------
+    None
+
+    """
+
+    missing_values_columns = study_data.columns[study_data.isna().any()].tolist()    # Get the columns with missing values
+    logger.write("Columns with missing values:", missing_values_columns)             # Write to changelog
+
+    return
 
 def tfidf_encoding(study_data: pd.DataFrame, changes: pd.DataFrame, logger: object) -> None:
         """
@@ -248,7 +267,7 @@ def tfidf_encoding(study_data: pd.DataFrame, changes: pd.DataFrame, logger: obje
         encoding_dict = _get_encoding_type(study_data, changes, logger)
 
         tfidf_applied_list = []    # List to store the columns that TF-IDF encoding was applied to
-        for column_name, encoding_type in encoding_dict:
+        for column_name, encoding_type in encoding_dict.items():
             if encoding_type == 'TF-IDF':
                 # Apply TF-IDF encoding
                 tfidf = sk.feature_extraction.text.TfidfVectorizer()

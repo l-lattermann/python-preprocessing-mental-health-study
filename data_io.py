@@ -2,6 +2,8 @@ import json
 import pandas as pd
 
 
+
+
 # Load the study data
 def load_data (logger: object) -> pd.DataFrame:
     """
@@ -49,3 +51,31 @@ def load_changes(logger: object) -> pd.DataFrame:
         logger.write("Changes file not found. Please check the file path in file_paths.json.") 
 
     return changes
+
+# Save data to csv
+def save_to_csv(data: pd.DataFrame, logger: object, file_name: str) -> None:
+    """
+    Saves the DataFrame to a CSV file.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The DataFrame to be saved.
+    file_name : str
+        The name of the file to be saved.
+
+    Returns
+    -------
+    None
+
+    """
+    if not file_name:
+        file_name = 'cleaned_and_encoded_data.csv'                    # Set the default file name
+    if not file_name.endswith('.csv'):                                # Check if the file name ends with .csv
+        file_name += '.csv'                                           # Add .csv to the file name
+    try:
+        data.to_csv(file_name, index=False)                           # Save the DataFrame to a CSV file
+        logger.write("Saved data to: " + file_name)                   # Write to changelog
+
+    except FileNotFoundError:
+        logger.write("File path not found. Please check the file path in file_paths.json.")

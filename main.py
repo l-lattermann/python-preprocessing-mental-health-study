@@ -49,22 +49,38 @@ if __name__ == "__main__":
     # ======================================================================== ENCODING ========================================================================
 
     # Fill missing age values with the median
-    enc.fill_missing_age_values(study_data, changes, changelog)
+    dc.fill_missing_age_values(study_data, changes, changelog)
 
     # Apply binary and ordinal encoding
     enc.apply_bin_ord_encoding(study_data, changes, changelog)
 
     # Fill the rest of the missing values
-    enc.fill_missing_values(study_data, changes, changelog)
+    dc.fill_missing_values(study_data, changes, changelog)
 
     # Check for missing values
-    enc.check_for_missing_values(study_data, changelog)
+    dc.check_for_missing_values(study_data, changelog)
 
+    # Convert all strings to lowercase
+    dc.lower_case(study_data, changelog)
+
+    # Log the unique values for one hot encoding
+    uniques  = enc.get_onehot_unique_values(study_data, changes, changelog)
+
+    # Catch typos and similars in one hot data
+    similars = dc.levenshtine_distance(uniques, 0.9, changelog)
+
+    # Replace similars with the more frequent value
+    dc.replace_similiar_strings(study_data, similars, changelog)
+
+    # Apply one hot encoding
+    enc.one_hot_encoding(study_data, changes, changelog)
+
+    # Save the cleaned and encoded data
+    io.save_to_csv(study_data, changelog, 'data/cleaned_and_encoded_data.csv')
+
+    exit()
     # Apply TF-IDF encoding
     enc.tfidf_encoding(study_data, changes, changelog)
-
-    # Apply one-hot encoding
-    enc.one_hot_encoding(study_data, changes, changelog)
 
     # ======================================================================== CLUSTERING ========================================================================
 

@@ -365,13 +365,22 @@ def int_all_floats(study_data: pd.DataFrame, logger: object)-> None:
     Returns
     -------
     None
+    
     """
+    # Convert nan to 0
+    for col in study_data.columns:
+        study_data[col] = study_data[col].apply(
+            lambda x: 0 if pd.isna(x) else x
+        )
+
+    # Convert integers with dtype float to dtype int
     changed_colums = []
     for col in study_data.columns:
         if study_data[col].dtype == float:
             changed_colums.append(col)
             study_data[col] = study_data[col].apply(
-                lambda x: int(x) if isinstance(x, float) & (x - int(x) == 0) else x
-                )
+                lambda x: int(x) if isinstance(x, float) and (x - int(x) == 0) else x
+            )
 
     logger.write("In the following columns float values got converted to integers:\n", changed_colums)
+

@@ -20,8 +20,8 @@ def load_data (logger: object) -> pd.DataFrame:
             file_paths = json.load(paths)                               # Load the file paths
             data_path = file_paths['data_path'][0]['path']              # Get the data path
 
-        study_data = pd.read_csv(data_path, encoding='utf-8')   # Load the study data
-        logger.write("Loaded study data from: " + data_path)    # Write to changelog
+        study_data = pd.read_csv(data_path, encoding='utf-8')           # Load the study data
+        logger.write("Loaded study data from: " + data_path)            # Write to changelog
     
     except FileNotFoundError:
         logger.write("Data file not found. Please check the file path in file_paths.json.")
@@ -42,7 +42,7 @@ def load_changes(logger: object) -> pd.DataFrame:
     try:
         with open('file_paths.json', 'r', encoding='latin1') as paths:  # Open the file paths JSON
             file_paths = json.load(paths)                               # Load the file paths
-            changes_path = file_paths['all_changes_path'][0]['path']           # Get the data path
+            changes_path = file_paths['all_changes_path'][0]['path']    # Get the data path
 
         changes = pd.read_csv(changes_path, encoding='utf-8')           # Load the changes data
         logger.write("Loaded changes data from: " + changes_path)       # Write to changelog

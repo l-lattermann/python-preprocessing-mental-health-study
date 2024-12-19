@@ -1,3 +1,4 @@
+
 import json
 from pathlib import Path
 import inspect
@@ -73,7 +74,10 @@ if __name__ == "__main__":
     dc.replace_similiar_strings(study_data, similars, changelog)
 
     # Apply one hot encoding
-    enc.one_hot_encoding(study_data, changes, changelog)
+    study_data = enc.one_hot_encoding(study_data, changes, changelog)
+
+    # Check for any remaining float integers and replace them with ints
+    dc.int_all_floats(study_data, changelog)
 
     # Save the cleaned and encoded data
     io.save_to_csv(study_data, changelog, 'data/cleaned_and_encoded_data.csv')

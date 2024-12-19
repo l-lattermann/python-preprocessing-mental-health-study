@@ -104,12 +104,12 @@ def apply_shortened_labels(study_data: pd.DataFrame, changes: pd.DataFrame, logg
     None
 
     """
-    new_labels_dict = {}                                                                # Dictionary to store the old and new labels
+    new_labels_dict = {}                                              # Dictionary to store the old and new labels
     for old_label in changes['old_labels'].dropna():
         new_labels_dict[old_label] = changes.loc[
-            changes['old_labels'] == old_label, 'new_labels'                            # Create a dictionary with old and new labels
+            changes['old_labels'] == old_label, 'new_labels'          # Create a dictionary with old and new labels
             ].values[0]
-    study_data.columns = study_data.columns.map(new_labels_dict)                        # Apply new shortened column labels
+    study_data.columns = study_data.columns.map(new_labels_dict)      # Apply new shortened column labels
 
     logger.write("Applied new shortened column labels as follows:\n", new_labels_dict)  # Write to changelog
 
@@ -318,7 +318,6 @@ def lower_case(study_data: pd.DataFrame, logger: object) -> None:
             )    
     logger.write("Converted all strings to lowercase.")             # Write to changelog
 
-
 def replace_similiar_strings(study_data: pd.DataFrame, similars_df: pd.DataFrame, logger: object) -> None:
     """
     Replaces similar strings in the DataFrame.
@@ -353,3 +352,26 @@ def replace_similiar_strings(study_data: pd.DataFrame, similars_df: pd.DataFrame
     logger.write("Replaced similar strings in the dataset.", replace_dict)               # Write to changelog
 
     return 
+
+def int_all_floats(study_data: pd.DataFrame, logger: object)-> None:
+    """
+    Converts all integers with dtype float to integers with dtype integer.
+
+    Parameters
+    ----------
+    study_data : pd.DataFrame
+        The DataFrame containing the study data.
+
+    Returns
+    -------
+    None
+    """
+    changed_colums = []
+    for col in study_data.columns:
+        if study_data[col].dtype == float:
+            changed_colums.append(col)
+            study_data[col] = study_data[col].apply(
+                lambda x: int(x) if isinstance(x, float) & (x - int(x) == 0) else x
+                )
+
+    logger.write("In the following columns float values got converted to integers:\n", changed_colums)

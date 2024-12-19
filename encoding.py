@@ -201,43 +201,42 @@ def get_onehot_unique_values(study_data: pd.DataFrame, changes: pd.DataFrame, lo
         return one_hot_unique_values
 
 def one_hot_encoding(study_data: pd.DataFrame, changes: pd.DataFrame, logger: object) -> None:
-        """
-        Apply one-hot encoding to the study data.
+    """
+    Apply one-hot encoding to the study data.
 
-        Parameters
-        ----------
-        study_data : pd.DataFrame
-            The DataFrame containing the study data.
-        changes : pd.DataFrame
-            The DataFrame containing the changes to be made to the study data.
-        logger : object
-            The logger object to write to the changelog.
+    Parameters
+    ----------
+    study_data : pd.DataFrame
+        The DataFrame containing the study data.
+    changes : pd.DataFrame
+        The DataFrame containing the changes to be made to the study data.
+    logger : object
+        The logger object to write to the changelog.
 
-        Returns
-        -------
-        None
+    Returns
+    -------
+    None
 
-        """
+    """
 
-        one_hot_applied_list = []    # List to store the columns that one-hot encoding was applied to
-        for column_name in changes.loc[changes['encoding_type'] == 'one-hot', 'new_labels'].dropna():
+    one_hot_applied_list = []    # List to store the columns that one-hot encoding was applied to
+    for column_name in changes.loc[changes['encoding_type'] == 'one-hot', 'new_labels'].dropna():
 
-                study_data[column_name] = study_data[column_name].str.split('|')                            # Split the values in the column
-                #study_data[column_name] = study_data[column_name].map(
-                #     lambda x: x.strip() if isinstance(x, str) and x.strip() else x                         # Strip the values in the column
-                #) 
-                print(all(isinstance(item, list) for item in study_data[column_name]))
-                print(study_data[column_name].apply(lambda x: x == [] or x == '').sum())
-                                
-                mlb = pre.MultiLabelBinarizer()                                                             # Initialize the MultiLabelBinarizer
-                one_hot = pd.DataFrame(mlb.fit_transform(study_data[column_name]), columns=mlb.classes_)
-                study_data.to_csv('one_hot.csv')                                                            # Save the one-hot encoded DataFrame to a CSV file
-                study_data = pd.concat([study_data, one_hot], axis=1)                                       # Concatenate the one-hot encoded columns to the study data
-                one_hot_applied_list.append(column_name)                                                    # Append the label to the list of applied one-hot encodings
+            study_data[column_name] = study_data[column_name].apply(
+                    lambda x: x.split('|') if isinstance(x, str) else x                                    # Split the values in the column
+                    )                       
+
+            study_data = study_data.explode(column_name)
+    
+            # Perform one-hot encoding
+            one_hot = pd.get_dummies(study_data[column_name], prefix=column_name).astype(int)
+            
+            # Drop the original column and concatenate one-hot encoded columns
+            study_data.drop(column_name, axis=1, inplace=True)
+            study_data = pd.concat([study_data, one_hot], axis=1)
+            
+    logger.write("Applied one-hot encoding to the following columns:", one_hot_applied_list)            # Write to changelog
+    logger.append("One-hot df looks like this: ", one_hot.head())                                       # Write to changelog
+
+    return study_data
         
-        logger.write("Applied one-hot encoding to the following columns:", one_hot_applied_list)            # Write to changelog
-        logger.append("One-hot df looks like this: ", one_hot.head())                                       # Write to changelog
-
-        
-
-    ## fill bin and ord values before one hot and idf encoding. and try to fill one hot and idf missing vlaues during encodign

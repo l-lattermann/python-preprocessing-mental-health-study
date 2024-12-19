@@ -80,11 +80,12 @@ if __name__ == "__main__":
     dc.int_all_floats(study_data, changelog)
 
     # Save the cleaned and encoded data
-    io.save_to_csv(study_data, changelog, 'data/cleaned_and_encoded_data.csv')
+    io.save_to_csv(study_data, changelog, 'data/before_idf.csv')
 
-    exit()
     # Apply TF-IDF encoding
-    enc.tfidf_encoding(study_data, changes, changelog)
+    study_data = enc.tfidf_encoding(study_data, changes, changelog)
 
+    # Save the cleaned and encoded data
+    io.save_to_csv(study_data, changelog, 'data/after_idf.csv')
     # ======================================================================== CLUSTERING ========================================================================
 

@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import json
-from sklearn import preprocessing as pre
+import sklearn as sk
 import Levenshtein as lev
 
 
@@ -132,42 +132,6 @@ def apply_bin_ord_encoding(study_data: pd.DataFrame, changes: pd.DataFrame, logg
     
     return
 
-def tfidf_encoding(study_data: pd.DataFrame, changes: pd.DataFrame, logger: object) -> None:
-        """
-        Apply TF-IDF encoding to the study data.
-
-        Parameters
-        ----------
-        study_data : pd.DataFrame
-            The DataFrame containing the study data.
-        changes : pd.DataFrame
-            The DataFrame containing the changes to be made to the study data.
-        logger : object 
-            The logger object to write to the changelog.
-
-        Returns
-        -------
-        None
-
-        """
-        # Get the encoding dictionary
-        encoding_dict = _get_encoding_type(study_data, changes, logger)
-
-        tfidf_applied_list = []    # List to store the columns that TF-IDF encoding was applied to
-        for column_name, encoding_type in encoding_dict.items():
-            if encoding_type == 'TF-IDF':
-                # Apply TF-IDF encoding
-                tfidf = sk.feature_extraction.text.TfidfVectorizer()
-                study_data[column_name] = tfidf.fit_transform(study_data[column_name])
-
-                # Append the label to the list of applied TF-IDF encodings
-                tfidf_applied_list.append(column_name)
-
-        # Write to changelog
-        logger.write("Applied TF-IDF encoding to the following columns:", tfidf_applied_list)
-        
-        return
-
 def get_onehot_unique_values(study_data: pd.DataFrame, changes: pd.DataFrame, logger: object) -> list:
         """
         Get the unique values in the columns that will be one-hot encoded.
@@ -226,17 +190,76 @@ def one_hot_encoding(study_data: pd.DataFrame, changes: pd.DataFrame, logger: ob
                     lambda x: x.split('|') if isinstance(x, str) else x                                    # Split the values in the column
                     )                       
 
-            study_data = study_data.explode(column_name)
+            # Isolate column to encode
+            one_hot_column = study_data[column_name]
+            
+            # Explode lists into single values
+            one_hot_column = one_hot_column.explode()
     
             # Perform one-hot encoding
-            one_hot = pd.get_dummies(study_data[column_name], prefix=column_name).astype(int)
+            one_hot = pd.get_dummies(one_hot_column, prefix=column_name).astype(int)
+
+            # Group by the original index and aggregate back to lists
+            one_hot_encoded = one_hot.groupby(one_hot.index).max()
             
             # Drop the original column and concatenate one-hot encoded columns
             study_data.drop(column_name, axis=1, inplace=True)
-            study_data = pd.concat([study_data, one_hot], axis=1)
+
+            study_data = study_data.reset_index(drop=True)
+            one_hot_encoded = one_hot_encoded.reset_index(drop=True)
+            study_data = pd.concat([study_data, one_hot_encoded], axis=1)
             
     logger.write("Applied one-hot encoding to the following columns:", one_hot_applied_list)            # Write to changelog
     logger.append("One-hot df looks like this: ", one_hot.head())                                       # Write to changelog
 
     return study_data
-        
+
+def tfidf_encoding(study_data: pd.DataFrame, changes: pd.DataFrame, logger: object) -> None:
+    """
+    Apply TF-IDF encoding to the study data.
+
+    Parameters
+    ----------
+    study_data : pd.DataFrame
+        The DataFrame containing the study data.
+    changes : pd.DataFrame
+        The DataFrame containing the changes to be made to the study data.
+    logger : object 
+        The logger object to write to the changelog.
+
+    Returns
+    -------
+    None
+
+    """
+
+    # Get the encoding dictionary
+    encoding_dict = _get_encoding_type(study_data, changes, logger)
+
+    tfidf_applied_list = []    # List to store the columns that TF-IDF encoding was applied to
+    for column_name, encoding_type in encoding_dict.items():
+        if encoding_type == 'TF-IDF':
+            # Apply TF-IDF encoding
+            tfidf = sk.feature_extraction.text.TfidfVectorizer()
+            tfidf_matrix = tfidf.fit_transform(study_data[column_name])
+
+            # Convert the sparse matrix to a DataFrame
+            tfidf_df = pd.DataFrame(
+                tfidf_matrix.toarray(),
+                index=study_data.index,
+                columns=tfidf.get_feature_names_out()
+            )
+
+            tfidf_df.to_csv(f'data/{column_name}tfidf_matrix.csv')
+
+            # Combine back into the DataFrame if needed
+            study_data.drop(column_name, axis=1, inplace=True)
+            study_data = pd.concat([study_data, tfidf_df], axis=1)
+
+            # Append the label to the list of applied TF-IDF encodings
+            tfidf_applied_list.append(column_name)
+
+    # Write to changelog
+    logger.write("Applied TF-IDF encoding to the following columns:", tfidf_applied_list)
+
+    return study_data
